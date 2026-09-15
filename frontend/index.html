@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LiveTranslate — Real-time Tamil Translation</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600&family=Space+Mono:wght@400;700&family=Inter:wght@300;400;600;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --surface2: #1a1a24;
+      --border: #2a2a3a;
+      --red: #e63946;
+      --red-dim: rgba(230, 57, 70, 0.15);
+      --text: #f0f0f5;
+      --text-dim: #8888aa;
+      --green: #4ade80;
+      --accent: #6366f1;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* HEADER */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Space Mono', monospace;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: var(--red);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .logo-sub {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      font-weight: 400;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.3s;
+    }
+    .status-dot.active {
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse-green 1.5s infinite;
+    }
+    @keyframes pulse-green {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* URL BAR */
+    .url-bar {
+      padding: 10px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .url-bar input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-family: 'Space Mono', monospace;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .url-bar input:focus { border-color: var(--accent); }
+    .url-bar input::placeholder { color: var(--text-dim); }
+
+    .btn {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .btn-start {
+      background: var(--red);
+      color: white;
+    }
+    .btn-start:hover { background: #c1121f; }
+    .btn-start:disabled { background: #444; color: #888; cursor: not-allowed; }
+    .btn-stop {
+      background: var(--surface2);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    .btn-stop:hover { border-color: var(--red); color: var(--red); }
+
+    /* MAIN CONTENT */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* LEFT - VIDEO */
+    .video-panel {
+      width: 58%;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+    }
+    .video-panel-header {
+      padding: 10px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .live-badge {
+      background: var(--red);
+      color: white;
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 1px;
+      display: none;
+    }
+    .live-badge.visible { display: inline-block; animation: pulse-red 1s infinite; }
+    @keyframes pulse-red {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .video-wrapper {
+      flex: 1;
+      position: relative;
+      background: #000;
+    }
+    .video-wrapper iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+    .video-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--text-dim);
+    }
+    .video-placeholder .icon { font-size: 3rem; opacity: 0.3; }
+    .video-placeholder p { font-size: 0.85rem; }
+
+    /* RIGHT - TRANSLATION */
+    .translation-panel {
+      width: 42%;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+    }
+    .translation-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .translation-title {
+      font-family: 'Noto Sans Tamil', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .translation-sub {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-family: 'Inter', sans-serif;
+      margin-top: 2px;
+    }
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+    .live-dot.streaming {
+      background: var(--red);
+      animation: pulse-red 1s infinite;
+    }
+
+    .translation-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      scroll-behavior: smooth;
+    }
+    .translation-scroll::-webkit-scrollbar { width: 4px; }
+    .translation-scroll::-webkit-scrollbar-track { background: transparent; }
+    .translation-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .translation-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 10px;
+      color: var(--text-dim);
+      text-align: center;
+    }
+    .translation-placeholder .icon { font-size: 2.5rem; opacity: 0.25; }
+    .translation-placeholder p { font-size: 0.85rem; line-height: 1.6; }
+
+    .translation-entry {
+      margin-bottom: 14px;
+      padding: 12px 14px;
+      background: var(--surface2);
+      border-radius: 10px;
+      border-left: 3px solid var(--red);
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .translation-entry .tamil-text {
+      font-family: 'Noto Sans Tamil', sans-serif;
+      font-size: 1.05rem;
+      line-height: 1.7;
+      color: var(--text);
+    }
+    .translation-entry .timestamp {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      margin-top: 6px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .translation-footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    #sentence-count { color: var(--accent); }
+
+    /* LOADING */
+    .loading-bar {
+      height: 2px;
+      background: var(--border);
+      position: relative;
+      overflow: hidden;
+      display: none;
+    }
+    .loading-bar.active { display: block; }
+    .loading-bar::after {
+      content: '';
+      position: absolute;
+      left: -40%;
+      width: 40%;
+      height: 100%;
+      background: var(--red);
+      animation: loading 1.2s infinite ease-in-out;
+    }
+    @keyframes loading {
+      0% { left: -40%; }
+      100% { left: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📡</div>
+    <div>
+      <div>LiveTranslate</div>
+      <div class="logo-sub">Real-time Tamil Translation</div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Ready</span>
+  </div>
+</header>
+
+<div class="url-bar">
+  <input
+    type="text"
+    id="urlInput"
+    placeholder="Paste YouTube URL here... e.g. https://www.youtube.com/watch?v=w_Ma8oQLmSM"
+    value="https://www.youtube.com/watch?v=w_Ma8oQLmSM"
+  />
+  <button class="btn btn-start" id="startBtn" onclick="startTranslation()">▶ Start</button>
+  <button class="btn btn-stop" id="stopBtn" onclick="stopTranslation()">■ Stop</button>
+</div>
+
+<div class="loading-bar" id="loadingBar"></div>
+
+<div class="main">
+  <!-- LEFT: VIDEO -->
+  <div class="video-panel">
+    <div class="video-panel-header">
+      📺 Video Feed
+      <span class="live-badge" id="liveBadge">LIVE</span>
+    </div>
+    <div class="video-wrapper" id="videoWrapper">
+      <div class="video-placeholder" id="videoPlaceholder">
+        <div class="icon">🎬</div>
+        <p>Paste a YouTube URL above<br/>and click Start to begin</p>
+      </div>
+      <!-- iframe injected here -->
+    </div>
+  </div>
+
+  <!-- RIGHT: TRANSLATION -->
+  <div class="translation-panel">
+    <div class="translation-header">
+      <div>
+        <div class="translation-title">தமிழ் மொழிபெயர்ப்பு</div>
+        <div class="translation-sub">Tamil Translation</div>
+      </div>
+      <div class="live-indicator">
+        <div class="live-dot" id="liveDot"></div>
+        <span id="liveText">Idle</span>
+      </div>
+    </div>
+
+    <div class="translation-scroll" id="translationScroll">
+      <div class="translation-placeholder" id="translationPlaceholder">
+        <div class="icon">🌐</div>
+        <p>Translation will appear here<br/>as the video plays in real-time</p>
+      </div>
+    </div>
+
+    <div class="translation-footer">
+      <span>Powered by Gemini 2.5 Flash</span>
+      <span><span id="sentence-count">0</span> sentences translated</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = 'http://localhost:8000';
+  let eventSource = null;
+  let sentenceCount = 0;
+  let isStreaming = false;
+
+  function extractVideoId(url) {
+    const patterns = [
+      /(?:v=|\/embed\/|youtu\.be\/|\/v\/|\/watch\?v=)([^&\n?#]+)/,
+      /^([a-zA-Z0-9_-]{11})$/
+    ];
+    for (const p of patterns) {
+      const m = url.match(p);
+      if (m) return m[1];
+    }
+    return null;
+  }
+
+  function loadVideo(url) {
+    const videoId = extractVideoId(url);
+    if (!videoId) {
+      alert('Could not extract YouTube video ID. Please check the URL.');
+      return false;
+    }
+    const wrapper = document.getElementById('videoWrapper');
+    document.getElementById('videoPlaceholder')?.remove();
+    let iframe = wrapper.querySelector('iframe');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.allowFullscreen = true;
+      iframe.allow = 'autoplay; encrypted-media';
+      wrapper.appendChild(iframe);
+    }
+    iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0`;
+    return true;
+  }
+
+  function addTranslation(text) {
+    const scroll = document.getElementById('translationScroll');
+    document.getElementById('translationPlaceholder')?.remove();
+
+    const entry = document.createElement('div');
+    entry.className = 'translation-entry';
+
+    const now = new Date();
+    const ts = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    entry.innerHTML = `
+      <div class="tamil-text">${text}</div>
+      <div class="timestamp">${ts}</div>
+    `;
+    scroll.appendChild(entry);
+    scroll.scrollTop = scroll.scrollHeight;
+
+    sentenceCount++;
+    document.getElementById('sentence-count').textContent = sentenceCount;
+  }
+
+  function setStatus(state) {
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    const liveDot = document.getElementById('liveDot');
+    const liveText = document.getElementById('liveText');
+    const liveBadge = document.getElementById('liveBadge');
+    const loadingBar = document.getElementById('loadingBar');
+
+    if (state === 'streaming') {
+      dot.classList.add('active');
+      text.textContent = 'Translating...';
+      liveDot.classList.add('streaming');
+      liveText.textContent = 'Streaming';
+      liveBadge.classList.add('visible');
+      loadingBar.classList.add('active');
+    } else if (state === 'connecting') {
+      dot.classList.remove('active');
+      text.textContent = 'Connecting...';
+      liveDot.classList.remove('streaming');
+      liveText.textContent = 'Connecting';
+      liveBadge.classList.remove('visible');
+      loadingBar.classList.add('active');
+    } else {
+      dot.classList.remove('active');
+      text.textContent = 'Ready';
+      liveDot.classList.remove('streaming');
+      liveText.textContent = 'Idle';
+      liveBadge.classList.remove('visible');
+      loadingBar.classList.remove('active');
+    }
+  }
+
+  async function startTranslation() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) { alert('Please enter a YouTube URL'); return; }
+
+    if (!loadVideo(url)) return;
+
+    document.getElementById('startBtn').disabled = true;
+    setStatus('connecting');
+
+    try {
+      const resp = await fetch(`${API_BASE}/api/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ youtube_url: url, target_language: 'Tamil' })
+      });
+
+      if (!resp.ok) throw new Error('Failed to start stream');
+
+      // Open SSE
+      if (eventSource) eventSource.close();
+      eventSource = new EventSource(`${API_BASE}/api/stream`);
+      isStreaming = true;
+      setStatus('streaming');
+
+      eventSource.onmessage = (e) => {
+        const data = e.data;
+        if (data === '[DONE]') {
+          stopTranslation();
+        } else if (data === '[PING]') {
+          // keepalive, ignore
+        } else if (data.startsWith('[Error')) {
+          addTranslation('⚠️ ' + data);
+        } else {
+          addTranslation(data);
+        }
+      };
+
+      eventSource.onerror = () => {
+        setStatus('ready');
+        document.getElementById('startBtn').disabled = false;
+        isStreaming = false;
+      };
+
+    } catch (err) {
+      alert('Error: ' + err.message + '\n\nMake sure the backend is running:\ncd backend && uvicorn main:app --reload');
+      setStatus('ready');
+      document.getElementById('startBtn').disabled = false;
+    }
+  }
+
+  async function stopTranslation() {
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+    try {
+      await fetch(`${API_BASE}/api/stop`, { method: 'POST' });
+    } catch {}
+    setStatus('ready');
+    document.getElementById('startBtn').disabled = false;
+    isStreaming = false;
+  }
+</script>
+</body>
+</html>
